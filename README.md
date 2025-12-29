@@ -4,4 +4,4 @@
 
 > A HTML-based, client-side web app to calculate differences between dates 🧮
 
-&rarr; [Live Page](https://mebebruno.github.io/DateGapper/)
+&rarr; [Live Page](https://mebebruno.github.io/DateGapper/index.html)
