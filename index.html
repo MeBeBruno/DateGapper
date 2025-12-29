@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <!-- viewport-fit=cover enables safe-area insets on iOS -->
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>DateGapper — Mobile-first date & time difference</title>
+
+  <style>
+    :root{
+      --bg: #0b1220;
+      --card: rgba(255,255,255,.06);
+      --card2: rgba(255,255,255,.08);
+      --text: #eaf0ff;
+      --muted: rgba(234,240,255,.72);
+      --border: rgba(255,255,255,.14);
+      --shadow: 0 18px 50px rgba(0,0,0,.35);
+      --accent: #3b82f6;
+      --accent2:#60a5fa;
+      --good: #22c55e;
+      --warn: #f59e0b;
+      --ring: 0 0 0 4px rgba(59,130,246,.22);
+      --radius: 18px;
+      --radius2: 14px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+
+      /* JS will set this to a reliable 1vh based on the *visible* viewport */
+      --vh: 1vh;
+
+      /* Safe-area for iOS (notch + home indicator) */
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+      --sal: env(safe-area-inset-left, 0px);
+      --sar: env(safe-area-inset-right, 0px);
+    }
+
+    [data-theme="light"]{
+      --bg: #f6f7fb;
+      --card: rgba(0,0,0,.04);
+      --card2: rgba(0,0,0,.06);
+      --text: #0b1020;
+      --muted: rgba(11,16,32,.66);
+      --border: rgba(0,0,0,.12);
+      --shadow: 0 16px 45px rgba(0,0,0,.12);
+      --accent: #2563eb;
+      --accent2: #3b82f6;
+      --ring: 0 0 0 4px rgba(37,99,235,.18);
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: var(--font);
+      color: var(--text);
+      background:
+        radial-gradient(900px 650px at 15% 10%, rgba(96,165,250,.25), transparent 55%),
+        radial-gradient(800px 600px at 85% 20%, rgba(34,197,94,.14), transparent 55%),
+        radial-gradient(900px 600px at 55% 95%, rgba(245,158,11,.12), transparent 55%),
+        var(--bg);
+
+      /* Mobile-first: use *visible* viewport height (addresses URL/search bar collapse/expand) */
+      min-height: 100svh; /* stable viewport on supporting browsers */
+      min-height: 100dvh; /* dynamic viewport (newer) */
+      min-height: calc(var(--vh) * 100); /* JS fallback: exact visible viewport */
+      padding: calc(16px + var(--sat)) calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal));
+
+      display:flex;
+      align-items: stretch;
+      justify-content:center;
+
+      /* prevents “rubber band” oddities from causing layout thrash */
+      overscroll-behavior-y: none;
+    }
+
+    /* App wrapper */
+    .wrap{
+      width: min(980px, 100%);
+      display:flex;
+      flex-direction: column;
+      gap: 14px;
+
+      /* Make sure the card sits nicely even when keyboard opens */
+      min-height: 0;
+    }
+
+    /* Mobile-first header: compact + sticky, stays accessible when URL bar changes */
+    header{
+      position: sticky;
+      top: calc(0px + var(--sat));
+      z-index: 10;
+      display:flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+
+      padding: 10px 10px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.12);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+    }
+    [data-theme="light"] header{ background: rgba(255,255,255,.75); }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      min-width: 0;
+    }
+    .logo{
+      width:40px;height:40px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display:grid;
+      place-items:center;
+      box-shadow: 0 10px 25px rgba(59,130,246,.25);
+      flex: 0 0 auto;
+    }
+    .logo svg{filter: drop-shadow(0 6px 10px rgba(0,0,0,.25))}
+    .brandText{min-width:0}
+    .brandText h1{
+      margin:0;
+      font-size: 15px;
+      letter-spacing:.2px;
+      line-height:1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 38vw;
+    }
+    .brandText p{
+      margin:2px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 42vw;
+    }
+
+    .actions{
+      display:flex;
+      gap: 8px;
+      align-items:center;
+      flex: 0 0 auto;
+    }
+
+    .pill{
+      display:flex;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.12);
+      border-radius: 999px;
+      overflow:hidden;
+    }
+    [data-theme="light"] .pill{ background: rgba(255,255,255,.65); }
+
+    .pill button{
+      appearance:none;
+      border:0;
+      background:transparent;
+      color: var(--muted);
+      padding: 9px 12px;
+      font-weight: 750;
+      font-size: 12px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      gap:6px;
+      transition: .15s ease;
+      white-space: nowrap;
+    }
+    .pill button[aria-pressed="true"]{
+      background: linear-gradient(135deg, rgba(59,130,246,.22), rgba(96,165,250,.18));
+      color: var(--text);
+    }
+
+    .btn{
+      appearance:none;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.12);
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 999px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      transition: .15s ease;
+      font-weight: 750;
+      font-size: 12px;
+    }
+    [data-theme="light"] .btn{ background: rgba(255,255,255,.65); }
+    .btn:focus{outline:none; box-shadow: var(--ring)}
+    .btn:active{transform: translateY(1px)}
+
+    .card{
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.10);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      overflow:hidden;
+
+      /* Allow content to scroll on super small screens / when keyboard open */
+      min-height: 0;
+    }
+    [data-theme="light"] .card{ background: rgba(255,255,255,.55); }
+
+    .cardHead{
+      padding: 14px 14px 10px;
+      display:flex;
+      flex-direction: column;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--card2), transparent);
+    }
+    .cardHeadTop{
+      display:flex;
+      align-items:flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .cardHead h2{
+      margin:0;
+      font-size: 15px;
+      letter-spacing:.2px;
+      line-height:1.2;
+    }
+    .cardHead small{
+      display:block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.10);
+      color: var(--text);
+      font-weight: 800;
+      font-size: 12px;
+      white-space:nowrap;
+      flex: 0 0 auto;
+    }
+    [data-theme="light"] .badge{ background: rgba(255,255,255,.6); }
+
+    .miniDot{
+      width:8px;height:8px;border-radius:999px;
+      background: var(--good);
+      box-shadow: 0 0 0 4px rgba(34,197,94,.14);
+    }
+
+    .content{
+      padding: 14px;
+      display:flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Mobile-first: single column fields */
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      align-items:end;
+    }
+
+    label{
+      display:grid;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: .15px;
+    }
+
+    .field{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding: 12px 12px;
+      border-radius: var(--radius2);
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.12);
+    }
+    [data-theme="light"] .field{background: rgba(255,255,255,.75)}
+    .field input{
+      width:100%;
+      border:0;
+      outline:none;
+      background: transparent;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: .2px;
+    }
+    .field input::-webkit-calendar-picker-indicator{opacity:.9; cursor:pointer}
+    .field:focus-within{box-shadow: var(--ring); border-color: rgba(59,130,246,.55)}
+
+    .swap{
+      width: 100%;
+      justify-content:center;
+      height: 44px;
+    }
+
+    /* Results: stack on mobile */
+    .results{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .stat{
+      border: 1px solid var(--border);
+      border-radius: var(--radius2);
+      background: rgba(0,0,0,.12);
+      padding: 14px;
+      display:grid;
+      gap: 4px;
+    }
+    [data-theme="light"] .stat{background: rgba(255,255,255,.75)}
+    .stat .k{
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 850;
+      letter-spacing: .15px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .dot{
+      width:10px;height:10px;border-radius:999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(59,130,246,.12);
+    }
+    .stat .v{
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: .2px;
+      line-height: 1.2;
+    }
+    .stat .s{
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .hint{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius2);
+      background: linear-gradient(135deg, rgba(59,130,246,.12), rgba(34,197,94,.08));
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .footerNote{
+      text-align:center;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 4px 0 0;
+    }
+
+    .hidden{display:none !important;}
+
+    /* ---- Larger screens: upgrade layout (still mobile-first) ---- */
+    @media (min-width: 820px){
+      .brandText h1{max-width: none}
+      .brandText p{max-width: none}
+
+      .cardHead{
+        flex-direction: column;
+      }
+      .grid{
+        grid-template-columns: 1fr 1fr auto;
+      }
+      .swap{
+        width: auto;
+        justify-content:flex-end;
+      }
+      .results{
+        grid-template-columns: 1.2fr 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap" id="app">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M7 3v3M17 3v3" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <path d="M4 8h16" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <path d="M6 6h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" stroke="white" stroke-width="2" opacity=".92"/>
+            <path d="M8 12h8M8 16h5" stroke="white" stroke-width="2" stroke-linecap="round" opacity=".9"/>
+          </svg>
+        </div>
+        <div class="brandText">
+          <h1>DateGapper</h1>
+          <p>Mobile-first date & time differences ✨</p>
+        </div>
+      </div>
+
+      <div class="actions">
+        <div class="pill" role="group" aria-label="Mode selector">
+          <button id="modeDates" aria-pressed="true" title="Compare two dates">📅</button>
+          <button id="modeTimes" aria-pressed="false" title="Compare two times">⏱️</button>
+        </div>
+
+        <button class="btn" id="themeBtn" title="Toggle theme">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M21 12.8A8.5 8.5 0 0 1 11.2 3a7.3 7.3 0 1 0 9.8 9.8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="card" aria-live="polite">
+      <div class="cardHead">
+        <div class="cardHeadTop">
+          <div>
+            <h2 id="panelTitle">Date difference</h2>
+            <small id="panelSub">Pick two dates. We’ll show calendar-aware results.</small>
+          </div>
+
+          <span class="badge" id="directionBadge" title="Whether the end is after the start">
+            <span class="miniDot" id="directionDot"></span>
+            <span id="directionText">OK</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="content">
+        <!-- DATES PANEL -->
+        <div id="datesPanel">
+          <div class="grid">
+            <label>
+              Start date
+              <div class="field"><input id="dateA" type="date" /></div>
+            </label>
+
+            <label>
+              End date
+              <div class="field"><input id="dateB" type="date" /></div>
+            </label>
+
+            <button class="btn swap" id="swapDates" title="Swap start and end">🔁 Swap</button>
+          </div>
+
+          <div class="results" style="margin-top: 10px;">
+            <div class="stat">
+              <div class="k"><span class="dot"></span>Total days</div>
+              <div class="v" id="daysOut">—</div>
+              <div class="s">Calendar days between the two dates.</div>
+            </div>
+
+            <div class="stat">
+              <div class="k"><span class="dot"></span>Months + days</div>
+              <div class="v" id="mdOut">—</div>
+              <div class="s">Calendar months (not 30-day months).</div>
+            </div>
+
+            <div class="stat">
+              <div class="k"><span class="dot"></span>Years + months + days</div>
+              <div class="v" id="ymdOut">—</div>
+              <div class="s">Human-friendly breakdown.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TIMES PANEL -->
+        <div id="timesPanel" class="hidden">
+          <div class="grid">
+            <label>
+              Start time
+              <div class="field"><input id="timeA" type="time" step="1" /></div>
+            </label>
+
+            <label>
+              End time
+              <div class="field"><input id="timeB" type="time" step="1" /></div>
+            </label>
+
+            <button class="btn swap" id="swapTimes" title="Swap start and end">🔁 Swap</button>
+          </div>
+
+          <div class="hint">
+            <div>End earlier than start → treated as crossing midnight.</div>
+            <div id="midnightHint">Cross-midnight: —</div>
+          </div>
+
+          <div class="results">
+            <div class="stat">
+              <div class="k"><span class="dot"></span>Total seconds</div>
+              <div class="v" id="secOut">—</div>
+              <div class="s">Exact span in seconds.</div>
+            </div>
+
+            <div class="stat">
+              <div class="k"><span class="dot"></span>HH:MM:SS</div>
+              <div class="v" id="hmsOut">—</div>
+              <div class="s">Hours can exceed 24.</div>
+            </div>
+
+            <div class="stat">
+              <div class="k"><span class="dot"></span>Days + hours + minutes</div>
+              <div class="v" id="dhmOut">—</div>
+              <div class="s">Nice for long spans.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footerNote">Viewport-safe on mobile (URL/search bar included) 🙂</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ---- Dynamic viewport height handling (mobile URL/search bar + keyboard) ----
+    // This sets --vh to the *visible* viewport height (works nicely on iOS Safari).
+    function setVH() {
+      const vv = window.visualViewport;
+      const h = vv ? vv.height : window.innerHeight;
+      document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
+    }
+    setVH();
+    window.addEventListener('resize', setVH, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', setVH, { passive: true });
+      window.visualViewport.addEventListener('scroll', setVH, { passive: true });
+    }
+
+    // ---------- Helpers ----------
+    const pad2 = (n) => String(n).padStart(2, "0");
+
+    function parseDateInput(value) {
+      if (!value) return null;
+      const [y, m, d] = value.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    function fmtPlural(n, unit) {
+      return `${n} ${unit}${n === 1 ? "" : "s"}`;
+    }
+
+    function stripTime(d) {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+
+    function clampOrder(a, b) {
+      if (a <= b) return { start: a, end: b, sign: 1 };
+      return { start: b, end: a, sign: -1 };
+    }
+
+    function addMonths(date, months) {
+      const d = new Date(date.getTime());
+      const day = d.getDate();
+      d.setDate(1);
+      d.setMonth(d.getMonth() + months);
+      const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(day, last));
+      return d;
+    }
+
+    function addYears(date, years) {
+      const d = new Date(date.getTime());
+      const m = d.getMonth();
+      const day = d.getDate();
+      d.setFullYear(d.getFullYear() + years, m, 1);
+      const last = new Date(d.getFullYear(), m + 1, 0).getDate();
+      d.setDate(Math.min(day, last));
+      return d;
+    }
+
+    function diffYMD(start, end) {
+      let years = 0, months = 0;
+
+      while (true) {
+        const next = addYears(start, years + 1);
+        if (next <= end) years++;
+        else break;
+      }
+
+      const afterYears = addYears(start, years);
+
+      while (true) {
+        const next = addMonths(afterYears, months + 1);
+        if (next <= end) months++;
+        else break;
+      }
+
+      const afterMonths = addMonths(afterYears, months);
+
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const days = Math.round((stripTime(end) - stripTime(afterMonths)) / msPerDay);
+
+      return { years, months, days };
+    }
+
+    function diffTotalDays(start, end) {
+      const msPerDay = 24 * 60 * 60 * 1000;
+      return Math.round((stripTime(end) - stripTime(start)) / msPerDay);
+    }
+
+    function parseTimeToSeconds(value) {
+      if (!value) return null;
+      const parts = value.split(":").map(Number);
+      const [h, m, s] = [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
+      return h * 3600 + m * 60 + s;
+    }
+
+    function secondsToHMS(totalSeconds) {
+      const s = Math.max(0, totalSeconds);
+      const hours = Math.floor(s / 3600);
+      const mins = Math.floor((s % 3600) / 60);
+      const secs = s % 60;
+      return `${pad2(hours)}:${pad2(mins)}:${pad2(secs)}`;
+    }
+
+    function secondsToDHM(totalSeconds) {
+      let s = Math.max(0, totalSeconds);
+      const days = Math.floor(s / 86400);
+      s %= 86400;
+      const hours = Math.floor(s / 3600);
+      s %= 3600;
+      const mins = Math.floor(s / 60);
+      return { days, hours, mins };
+    }
+
+    // ---------- UI wiring ----------
+    const root = document.documentElement;
+
+    const modeDatesBtn = document.getElementById("modeDates");
+    const modeTimesBtn = document.getElementById("modeTimes");
+    const datesPanel = document.getElementById("datesPanel");
+    const timesPanel = document.getElementById("timesPanel");
+
+    const panelTitle = document.getElementById("panelTitle");
+    const panelSub = document.getElementById("panelSub");
+
+    const directionDot = document.getElementById("directionDot");
+    const directionText = document.getElementById("directionText");
+
+    const themeBtn = document.getElementById("themeBtn");
+
+    const dateA = document.getElementById("dateA");
+    const dateB = document.getElementById("dateB");
+    const swapDates = document.getElementById("swapDates");
+
+    const daysOut = document.getElementById("daysOut");
+    const mdOut = document.getElementById("mdOut");
+    const ymdOut = document.getElementById("ymdOut");
+
+    const timeA = document.getElementById("timeA");
+    const timeB = document.getElementById("timeB");
+    const swapTimes = document.getElementById("swapTimes");
+
+    const secOut = document.getElementById("secOut");
+    const hmsOut = document.getElementById("hmsOut");
+    const dhmOut = document.getElementById("dhmOut");
+    const midnightHint = document.getElementById("midnightHint");
+
+    function setMode(mode) {
+      const isDates = mode === "dates";
+      modeDatesBtn.setAttribute("aria-pressed", String(isDates));
+      modeTimesBtn.setAttribute("aria-pressed", String(!isDates));
+
+      datesPanel.classList.toggle("hidden", !isDates);
+      timesPanel.classList.toggle("hidden", isDates);
+
+      if (isDates) {
+        panelTitle.textContent = "Date difference";
+        panelSub.textContent = "Pick two dates. We’ll show calendar-aware results.";
+      } else {
+        panelTitle.textContent = "Time span";
+        panelSub.textContent = "Pick two times. End earlier = crosses midnight.";
+      }
+
+      localStorage.setItem("DateGapper_mode", mode);
+      isDates ? updateDates() : updateTimes();
+    }
+
+    function setTheme(theme) {
+      root.setAttribute("data-theme", theme);
+      localStorage.setItem("DateGapper_theme", theme);
+    }
+
+    function updateDirectionBadge(sign) {
+      const ok = sign === 1;
+      directionText.textContent = ok ? "OK" : "Reversed";
+      directionDot.style.background = ok ? "var(--good)" : "var(--warn)";
+      directionDot.style.boxShadow = ok
+        ? "0 0 0 4px rgba(34,197,94,.14)"
+        : "0 0 0 4px rgba(245,158,11,.16)";
+    }
+
+    // ---------- Calculations ----------
+    function updateDates() {
+      const a = parseDateInput(dateA.value);
+      const b = parseDateInput(dateB.value);
+      if (!a || !b) {
+        daysOut.textContent = "—";
+        mdOut.textContent = "—";
+        ymdOut.textContent = "—";
+        updateDirectionBadge(1);
+        return;
+      }
+
+      const { start, end, sign } = clampOrder(stripTime(a), stripTime(b));
+      updateDirectionBadge(sign);
+
+      const totalDays = diffTotalDays(start, end);
+      const { years, months, days } = diffYMD(start, end);
+      const totalMonths = years * 12 + months;
+
+      daysOut.textContent = fmtPlural(totalDays, "day");
+      mdOut.textContent = `${fmtPlural(totalMonths, "month")} and ${fmtPlural(days, "day")}`;
+      ymdOut.textContent = `${fmtPlural(years, "year")}, ${fmtPlural(months, "month")}, ${fmtPlural(days, "day")}`;
+    }
+
+    function updateTimes() {
+      const a = parseTimeToSeconds(timeA.value);
+      const b = parseTimeToSeconds(timeB.value);
+
+      if (a == null || b == null) {
+        secOut.textContent = "—";
+        hmsOut.textContent = "—";
+        dhmOut.textContent = "—";
+        midnightHint.textContent = "Cross-midnight: —";
+        updateDirectionBadge(1);
+        return;
+      }
+
+      let crossed = false;
+      let start = a, end = b;
+      if (b < a) {
+        crossed = true;
+        end = b + 24 * 3600;
+      }
+
+      updateDirectionBadge(1);
+
+      const total = Math.max(0, end - start);
+      secOut.textContent = total.toLocaleString();
+      hmsOut.textContent = secondsToHMS(total);
+
+      const dhm = secondsToDHM(total);
+      dhmOut.textContent = `${fmtPlural(dhm.days, "day")}, ${fmtPlural(dhm.hours, "hour")}, ${fmtPlural(dhm.mins, "minute")}`;
+      midnightHint.textContent = `Cross-midnight: ${crossed ? "yes ✅" : "no"}`;
+    }
+
+    // ---------- Events ----------
+    modeDatesBtn.addEventListener("click", () => setMode("dates"));
+    modeTimesBtn.addEventListener("click", () => setMode("times"));
+
+    themeBtn.addEventListener("click", () => {
+      const current = root.getAttribute("data-theme") || "dark";
+      setTheme(current === "dark" ? "light" : "dark");
+    });
+
+    dateA.addEventListener("input", updateDates);
+    dateB.addEventListener("input", updateDates);
+    swapDates.addEventListener("click", () => {
+      const tmp = dateA.value;
+      dateA.value = dateB.value;
+      dateB.value = tmp;
+      updateDates();
+    });
+
+    timeA.addEventListener("input", updateTimes);
+    timeB.addEventListener("input", updateTimes);
+    swapTimes.addEventListener("click", () => {
+      const tmp = timeA.value;
+      timeA.value = timeB.value;
+      timeB.value = tmp;
+      updateTimes();
+    });
+
+    // ---------- Init ----------
+    (function init() {
+      const savedTheme = localStorage.getItem("DateGapper_theme");
+      setTheme(savedTheme || "dark");
+
+      const savedMode = localStorage.getItem("DateGapper_mode") || "dates";
+      setMode(savedMode);
+
+      const today = new Date();
+      const plus7 = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7);
+      const toISODate = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+
+      if (!dateA.value) dateA.value = toISODate(today);
+      if (!dateB.value) dateB.value = toISODate(plus7);
+
+      if (!timeA.value) timeA.value = "09:00:00";
+      if (!timeB.value) timeB.value = "17:30:00";
+
+      updateDates();
+      updateTimes();
+    })();
+  </script>
+</body>
+</html>
